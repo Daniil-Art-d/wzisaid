@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CS2pros — Аналитика профиля, K/D и Тир-лист игроков</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            cs: {
+              bg: '#09090B',
+              surface: '#111114',
+              card: '#16161A',
+              border: '#27272A',
+              orange: '#FF5500',
+              orangeHover: '#E04B00',
+              orangeMuted: 'rgba(255, 85, 0, 0.12)',
+              text: '#F4F4F5',
+              muted: '#A1A1AA'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Базовые настройки и скроллбар */
+    body {
+      background-color: #09090B;
+      color: #F4F4F5;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #09090B;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272A;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #FF5500;
+    }
+    /* Тонкая сетка на фоне первого экрана */
+    .bg-tactical-grid {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+    /* Плавные переходы для карточек и вкладок */
+    .fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-cs-orange selection:text-white">
+
+  <!-- Уведомления (Toast container) -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-[calc(100vw-2rem)] sm:max-w-sm pointer-events-none"></div>
+
+  <!-- Навигация -->
+  <header class="sticky top-0 z-40 border-b border-cs-border bg-cs-bg/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- Логотип -->
+      <a href="#" class="flex items-center gap-2.5 group shrink-0">
+        <div class="w-8 h-8 rounded bg-cs-orange flex items-center justify-center text-black font-extrabold text-sm tracking-tighter group-hover:bg-cs-orangeHover transition-colors">
+          CS2
+        </div>
+        <span class="font-bold text-lg tracking-tight text-white">CS2<span class="text-cs-orange">pros</span></span>
+      </a>
+
+      <!-- Десктопное меню -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-cs-muted">
+        <a href="#accounts" class="hover:text-white transition-colors" data-i18n="nav_accounts">Аккаунты</a>
+        <a href="#stats" class="hover:text-white transition-colors" data-i18n="nav_stats">Статистика и K/D</a>
+        <a href="#tierlist" class="hover:text-white transition-colors" data-i18n="nav_tierlist">Тир-лист игроков</a>
+        <a href="#team-tierlist" class="hover:text-white transition-colors" data-i18n="nav_teams">Тир-лист команд</a>
+      </nav>
+
+      <!-- Действия: Переключатель языка + Кнопка подключения -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="lang-toggle" type="button" class="px-2.5 py-1.5 rounded border border-cs-border bg-cs-surface text-xs font-mono font-bold text-cs-muted hover:text-white hover:border-cs-orange transition-colors" aria-label="Switch language">
+          RU / EN
+        </button>
+        <a href="#accounts" id="header-connect-btn" class="px-3.5 py-2 rounded bg-cs-orange hover:bg-cs-orangeHover text-black font-semibold text-xs sm:text-sm transition-colors flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-black animate-pulse" id="header-status-dot"></span>
+          <span data-i18n="btn_connect_header">Подключить</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Первый экран (Hero) -->
+  <section class="relative border-b border-cs-border bg-tactical-grid overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 lg:py-24">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+        
+        <!-- Левая колонка: Текст и CTA -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cs-orange/30 bg-cs-orangeMuted text-cs-orange text-xs font-mono uppercase tracking-wider">
+            <span class="w-1.5 h-1.5 rounded-full bg-cs-orange"></span>
+            <span data-i18n="hero_badge">FACEIT & STEAM TELEMETRY</span>
+          </div>
+          
+          <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1]" data-i18n="hero_title">
+            Твой единый профиль и аналитика в <span class="text-cs-orange">Counter-Strike 2</span>
+          </h1>
+          
+          <p class="text-base sm:text-lg text-cs-muted max-w-2xl leading-relaxed" data-i18n="hero_subtitle">
+            Объедини статистику Steam Premier и матчей FACEIT в одном окне. Точный расчёт K/D, учёт убийств в голову и актуальный тир-лист лучших игроков мира без лишнего шума.
+          </p>
+          
+          <div class="flex flex-col sm:flex-row gap-3 pt-2">
+            <a href="#accounts" class="px-6 py-3.5 rounded bg-cs-orange hover:bg-cs-orangeHover text-black font-bold text-sm text-center transition-colors" data-i18n="hero_cta_primary">
+              Привязать Steam / FACEIT
+            </a>
+            <a href="#tierlist" class="px-6 py-3.5 rounded border border-cs-border bg-cs-surface hover:border-cs-muted text-white font-semibold text-sm text-center transition-colors" data-i18n="hero_cta_secondary">
+              Открыть тир-лист PRO
+            </a>
+          </div>
+        </div>
+
+        <!-- Правая колонка: Сводная карточка статуса игрока -->
+        <div class="lg:col-span-5">
+          <div class="rounded-xl border border-cs-border bg-cs-surface p-6 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-cs-border pb-4 mb-5">
+              <div>
+                <p class="text-xs font-mono uppercase text-cs-muted" data-i18n="hero_card_label">АКТИВНЫЙ ПРОФИЛЬ</p>
+                <h2 id="hero-player-name" class="text-xl font-bold text-white mt-0.5" data-i18n="guest_player">Профиль не привязан</h2>
+              </div>
+              <div id="hero-elo-badge" class="px-3 py-1.5 rounded bg-cs-card border border-cs-border font-mono text-xs text-cs-muted">
+                ELO: —
+              </div>
+            </div>
+
+            <!-- Быстрые метрики -->
+            <div class="grid grid-cols-3 gap-3 mb-5">
+              <div class="p-3 rounded-lg bg-cs-card border border-cs-border">
+                <span class="text-xs text-cs-muted block" data-i18n="metric_kd">Общий K/D</span>
+                <span id="hero-kd-val" class="text-xl sm:text-2xl font-mono font-bold text-cs-orange mt-1 block">0.00</span>
+              </div>
+              <div class="p-3 rounded-lg bg-cs-card border border-cs-border">
+                <span class="text-xs text-cs-muted block" data-i18n="metric_kills">Убийства</span>
+                <span id="hero-kills-val" class="text-xl sm:text-2xl font-mono font-bold text-white mt-1 block">0</span>
+              </div>
+              <div class="p-3 rounded-lg bg-cs-card border border-cs-border">
+                <span class="text-xs text-cs-muted block">HS %</span>
+                <span id="hero-hs-val" class="text-xl sm:text-2xl font-mono font-bold text-white mt-1 block">0%</span>
+              </div>
+            </div>
+
+            <!-- Индикаторы платформ -->
+            <div class="space-y-2.5 text-xs">
+              <div class="flex items-center justify-between p-2.5 rounded bg-cs-bg border border-cs-border">
+                <span class="font-medium text-cs-muted flex items-center gap-2">
+                  <span id="steam-dot" class="w-2 h-2 rounded-full bg-zinc-600"></span>
+                  Steam ID64
+                </span>
+                <span id="hero-steam-status" class="font-mono text-zinc-500" data-i18n="status_disconnected">Не подключен</span>
+              </div>
+              <div class="flex items-center justify-between p-2.5 rounded bg-cs-bg border border-cs-border">
+                <span class="font-medium text-cs-muted flex items-center gap-2">
+                  <span id="faceit-dot" class="w-2 h-2 rounded-full bg-zinc-600"></span>
+                  FACEIT Account
+                </span>
+                <span id="hero-faceit-status" class="font-mono text-zinc-500" data-i18n="status_disconnected">Не подключен</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Раздел 1: Подключение Steam и FACEIT -->
+  <section id="accounts" class="py-14 sm:py-20 border-b border-cs-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+        <div>
+          <span class="text-xs font-mono uppercase tracking-wider text-cs-orange" data-i18n="sec_acc_tag">01 / ИНТЕГРАЦИЯ</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white mt-1" data-i18n="sec_acc_title">Подключение игровых аккаунтов</h2>
+          <p class="text-sm text-cs-muted mt-2 max-w-2xl" data-i18n="sec_acc_desc">
+            Введите ваш никнейм или ссылку на профиль для синхронизации матчей. Данные сохраняются локально в вашем браузере.
+          </p>
+        </div>
+        <button id="demo-fill-btn" type="button" class="self-start md:self-auto px-4 py-2 rounded border border-cs-border bg-cs-surface hover:border-cs-orange text-xs font-mono text-cs-muted hover:text-white transition-colors" data-i18n="btn_demo_fill">
+          Загрузить демо-профиль
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Карточка Steam -->
+        <div class="rounded-xl border border-cs-border bg-cs-surface p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-cs-card border border-cs-border flex items-center justify-center text-white">
+                  <!-- Иконка Steam SVG -->
+                  <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z"/></svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white">Steam Community</h3>
+                  <p class="text-xs text-cs-muted" data-i18n="steam_sub">Premier рейтинг и официальные матчи</p>
+                </div>
+              </div>
+              <span id="steam-badge" class="px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 text-zinc-400" data-i18n="badge_offline">Офлайн</span>
+            </div>
+
+            <form id="steam-form" class="space-y-4">
+              <div>
+                <label for="steam-input" class="block text-xs font-medium text-cs-muted mb-1.5" data-i18n="steam_label">Steam ID64 или Custom URL</label>
+                <input id="steam-input" type="text" placeholder="76561198000000000 или nickname" class="w-full px-3.5 py-2.5 rounded-lg bg-cs-bg border border-cs-border text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cs-orange transition-colors">
+                <p id="steam-error" class="text-xs text-red-400 mt-1.5 hidden"></p>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="submit" id="steam-submit-btn" class="flex-1 py-2.5 px-4 rounded-lg bg-cs-orange hover:bg-cs-orangeHover text-black font-semibold text-sm transition-colors" data-i18n="btn_connect_steam">
+                  Подключить Steam
+                </button>
+                <button type="button" id="steam-disconnect-btn" class="hidden py-2.5 px-4 rounded-lg border border-cs-border hover:border-red-500/50 text-xs font-medium text-cs-muted hover:text-red-400 transition-colors" data-i18n="btn_disconnect">
+                  Отключить
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div id="steam-connected-info" class="hidden mt-5 pt-4 border-t border-cs-border flex items-center justify-between text-xs">
+            <span class="text-cs-muted">CS2 Premier Rating:</span>
+            <span id="steam-premier-val" class="font-mono font-bold text-cs-orange">18,450 CSR</span>
+          </div>
+        </div>
+
+        <!-- Карточка FACEIT -->
+        <div class="rounded-xl border border-cs-border bg-cs-surface p-6 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-cs-card border border-cs-border flex items-center justify-center text-cs-orange">
+                  <!-- Иконка FACEIT SVG -->
+                  <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M24 2.7L0 12.1l9.5 3.6L24 2.7zM9.5 17.5v3.8l4.2-2.6-4.2-1.2z"/></svg>
+                </div>
+                <div>
+                  <h3 class="font-bold text-white">FACEIT Competitive</h3>
+                  <p class="text-xs text-cs-muted" data-i18n="faceit_sub">Уровень ELO, история матчей 128-tick</p>
+                </div>
+              </div>
+              <span id="faceit-badge" class="px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 text-zinc-400" data-i18n="badge_offline">Офлайн</span>
+            </div>
+
+            <form id="faceit-form" class="space-y-4">
+              <div>
+                <label for="faceit-input" class="block text-xs font-medium text-cs-muted mb-1.5" data-i18n="faceit_label">Никнейм на FACEIT</label>
+                <input id="faceit-input" type="text" placeholder="Например: s1mple или m0NESY" class="w-full px-3.5 py-2.5 rounded-lg bg-cs-bg border border-cs-border text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cs-orange transition-colors">
+                <p id="faceit-error" class="text-xs text-red-400 mt-1.5 hidden"></p>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="submit" id="faceit-submit-btn" class="flex-1 py-2.5 px-4 rounded-lg bg-cs-orange hover:bg-cs-orangeHover text-black font-semibold text-sm transition-colors" data-i18n="btn_connect_faceit">
+                  Подключить FACEIT
+                </button>
+                <button type="button" id="faceit-disconnect-btn" class="hidden py-2.5 px-4 rounded-lg border border-cs-border hover:border-red-500/50 text-xs font-medium text-cs-muted hover:text-red-400 transition-colors" data-i18n="btn_disconnect">
+                  Отключить
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div id="faceit-connected-info" class="hidden mt-5 pt-4 border-t border-cs-border flex items-center justify-between text-xs">
+            <span class="text-cs-muted">FACEIT Level / ELO:</span>
+            <span id="faceit-level-val" class="font-mono font-bold text-cs-orange">LVL 10 • 2,410 ELO</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Раздел 2: Подсчет убийств и K/D -->
+  <section id="stats" class="py-14 sm:py-20 border-b border-cs-border bg-cs-surface/40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+        <div>
+          <span class="text-xs font-mono uppercase tracking-wider text-cs-orange" data-i18n="sec_stats_tag">02 / ТЕЛЕМЕТРИЯ И K/D</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white mt-1" data-i18n="sec_stats_title">Подсчёт убийств и эффективности</h2>
+          <p class="text-sm text-cs-muted mt-2 max-w-2xl" data-i18n="sec_stats_desc">
+            Сводка по подключенным аккаунтам. Вы также можете вручную добавить результат сыгранного матча для перерасчёта актуального K/D.
+          </p>
+        </div>
+
+        <!-- Фильтр источника данных -->
+        <div class="inline-flex rounded-lg border border-cs-border bg-cs-bg p-1 self-start">
+          <button type="button" data-source="all" class="source-filter-btn px-3 py-1.5 rounded-md text-xs font-semibold bg-cs-orange text-black transition-colors" data-i18n="filter_all">Все матчи</button>
+          <button type="button" data-source="faceit" class="source-filter-btn px-3 py-1.5 rounded-md text-xs font-semibold text-cs-muted hover:text-white transition-colors">FACEIT</button>
+          <button type="button" data-source="steam" class="source-filter-btn px-3 py-1.5 rounded-md text-xs font-semibold text-cs-muted hover:text-white transition-colors">Steam</button>
+        </div>
+      </div>
+
+      <!-- Пустое состояние (когда ни один аккаунт не привязан и матчей нет) -->
+      <div id="stats-empty-state" class="rounded-xl border border-dashed border-cs-border bg-cs-surface p-10 text-center max-w-2xl mx-auto">
+        <div class="w-12 h-12 rounded-full bg-cs-card border border-cs-border flex items-center justify-center mx-auto mb-4 text-cs-orange">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-2" data-i18n="empty_stats_title">Нет данных для расчёта K/D</h3>
+        <p class="text-sm text-cs-muted mb-6" data-i18n="empty_stats_desc">
+          Подключите аккаунт Steam или FACEIT выше, чтобы загрузить историю убийств и смертей, или загрузите демо-профиль для проверки.
+        </p>
+        <a href="#accounts" class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-cs-orange hover:bg-cs-orangeHover text-black font-semibold text-sm transition-colors" data-i18n="empty_stats_btn">
+          Перейти к подключению
+        </a>
+      </div>
+
+      <!-- Контент статистики (скрыт пока нет данных) -->
+      <div id="stats-dashboard" class="hidden space-y-8 fade-in">
+        <!-- 4 главные карточки метрик -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="rounded-xl border border-cs-border bg-cs-surface p-5">
+            <span class="text-xs font-medium text-cs-muted" data-i18n="stat_total_kills">Всего убийств (Kills)</span>
+            <div id="stat-kills" class="text-2xl sm:text-3xl font-mono font-bold text-white mt-2">0</div>
+            <span class="text-xs text-emerald-400 font-mono mt-1 block" id="stat-kpr">0.82 K/R</span>
+          </div>
+          <div class="rounded-xl border border-cs-border bg-cs-surface p-5">
+            <span class="text-xs font-medium text-cs-muted" data-i18n="stat_total_deaths">Всего смертей (Deaths)</span>
+            <div id="stat-deaths" class="text-2xl sm:text-3xl font-mono font-bold text-white mt-2">0</div>
+            <span class="text-xs text-cs-muted font-mono mt-1 block" data-i18n="stat_matches_count">За все матчи</span>
+          </div>
+          <div class="rounded-xl border border-cs-orange/40 bg-cs-surface p-5">
+            <span class="text-xs font-medium text-cs-orange" data-i18n="stat_kd_ratio">Коэффициент K/D</span>
+            <div id="stat-kd" class="text-2xl sm:text-3xl font-mono font-bold text-cs-orange mt-2">0.00</div>
+            <span id="stat-kd-diff" class="text-xs font-mono mt-1 block text-cs-muted">+0 K/D Diff</span>
+          </div>
+          <div class="rounded-xl border border-cs-border bg-cs-surface p-5">
+            <span class="text-xs font-medium text-cs-muted" data-i18n="stat_hs_pct">Процент хедшотов</span>
+            <div id="stat-hs" class="text-2xl sm:text-3xl font-mono font-bold text-white mt-2">0%</div>
+            <span class="text-xs text-cs-muted font-mono mt-1 block" id="stat-winrate">Winrate: 54%</span>
+          </div>
+        </div>
+
+        <!-- Интерактивный калькулятор / Добавление матча в статистику -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-5 rounded-xl border border-cs-border bg-cs-surface p-6">
+            <h3 class="text-base font-bold text-white mb-1" data-i18n="calc_title">Добавить матч в статистику</h3>
+            <p class="text-xs text-cs-muted mb-5" data-i18n="calc_desc">Запишите результат последней игры, чтобы мгновенно пересчитать ваш общий K/D.</p>
+            
+            <form id="add-match-form" class="space-y-4">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="match-platform" class="block text-xs text-cs-muted mb-1" data-i18n="calc_platform">Платформа</label>
+                  <select id="match-platform" class="w-full px-3 py-2 rounded-lg bg-cs-bg border border-cs-border text-sm text-white focus:outline-none focus:border-cs-orange">
+                    <option value="faceit">FACEIT</option>
+                    <option value="steam">Steam Premier</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="match-map" class="block text-xs text-cs-muted mb-1" data-i18n="calc_map">Карта</label>
+                  <select id="match-map" class="w-full px-3 py-2 rounded-lg bg-cs-bg border border-cs-border text-sm text-white focus:outline-none focus:border-cs-orange">
+                    <option value="Mirage">Mirage</option>
+                    <option value="Inferno">Inferno</option>
+                    <option value="Ancient">Ancient</option>
+                    <option value="Anubis">Anubis</option>
+                    <option value="Nuke">Nuke</option>
+                    <option value="Dust2">Dust 2</option>
+                    <option value="Vertigo">Vertigo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label for="match-kills" class="block text-xs text-cs-muted mb-1" data-i18n="calc_kills">Убийства (K)</label>
+                  <input id="match-kills" type="number" min="0" max="100" required placeholder="22" class="w-full px-3 py-2 rounded-lg bg-cs-bg border border-cs-border text-sm font-mono text-white focus:outline-none focus:border-cs-orange">
+                </div>
+                <div>
+                  <label for="match-deaths" class="block text-xs text-cs-muted mb-1" data-i18n="calc_deaths">Смерти (D)</label>
+                  <input id="match-deaths" type="number" min="0" max="100" required placeholder="15" class="w-full px-3 py-2 rounded-lg bg-cs-bg border border-cs-border text-sm font-mono text-white focus:outline-none focus:border-cs-orange">
+                </div>
+                <div>
+                  <label for="match-hs" class="block text-xs text-cs-muted mb-1">HS %</label>
+                  <input id="match-hs" type="number" min="0" max="100" required placeholder="55" class="w-full px-3 py-2 rounded-lg bg-cs-bg border border-cs-border text-sm font-mono text-white focus:outline-none focus:border-cs-orange">
+                </div>
+              </div>
+
+              <button type="submit" class="w-full py-2.5 px-4 rounded-lg bg-cs-orange hover:bg-cs-orangeHover text-black font-semibold text-sm transition-colors" data-i18n="calc_submit">
+                Добавить и пересчитать K/D
+              </button>
+            </form>
+          </div>
+
+          <!-- Таблица последних матчей -->
+          <div class="lg:col-span-7 rounded-xl border border-cs-border bg-cs-surface p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-base font-bold text-white" data-i18n="recent_matches_title">История учтённых матчей</h3>
+              <span id="matches-counter" class="text-xs font-mono text-cs-muted">0 матчей</span>
+            </div>
+            <div class="overflow-x-auto flex-1">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-cs-border text-xs font-mono text-cs-muted uppercase">
+                    <th class="py-2.5 pr-3" data-i18n="th_source">Платформа</th>
+                    <th class="py-2.5 px-3" data-i18n="th_map">Карта</th>
+                    <th class="py-2.5 px-3">K / D</th>
+                    <th class="py-2.5 px-3">K/D</th>
+                    <th class="py-2.5 pl-3 text-right">HS%</th>
+                  </tr>
+                </thead>
+                <tbody id="matches-table-body" class="divide-y divide-cs-border text-sm">
+                  <!-- Заполняется через JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Раздел 3: Тир-лист про-игроков CS2 -->
+  <section id="tierlist" class="py-14 sm:py-20 border-b border-cs-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+        <div>
+          <span class="text-xs font-mono uppercase tracking-wider text-cs-orange" data-i18n="sec_tier_tag">03 / РЕЙТИНГ ПРО-СЦЕНЫ</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white mt-1" data-i18n="sec_tier_title">Рейтинг про-игроков CS2 по K/D</h2>
+          <p class="text-sm text-cs-muted mt-2 max-w-2xl" data-i18n="sec_tier_desc">
+            Единый вертикальный тир-лист с автоматической сортировкой по коэффициенту K/D. Переключайтесь между дивизионами Tier 1, Tier 2 и Tier 3 или нажмите на игрока для смены его тира.
+          </p>
+        </div>
+
+        <!-- Фильтры и поиск по тир-листу -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="tier-search" type="text" placeholder="Поиск игрока или команды..." class="px-3.5 py-2 rounded-lg bg-cs-surface border border-cs-border text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cs-orange">
+          <select id="tier-role-filter" class="px-3.5 py-2 rounded-lg bg-cs-surface border border-cs-border text-sm text-white focus:outline-none focus:border-cs-orange">
+            <option value="all" data-i18n="role_all">Все роли</option>
+            <option value="AWPer">AWPer</option>
+            <option value="Rifler">Rifler</option>
+            <option value="IGL">IGL</option>
+          </select>
+          <button id="reset-tiers-btn" type="button" class="px-3.5 py-2 rounded-lg border border-cs-border bg-cs-surface hover:border-cs-muted text-xs font-mono text-cs-muted hover:text-white transition-colors" data-i18n="btn_reset_tiers">
+            Сбросить тиры
+          </button>
+        </div>
+      </div>
+
+      <!-- Вкладки разделов: Tier 1 / Tier 2 / Tier 3 -->
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div class="inline-flex rounded-lg border border-cs-border bg-cs-surface p-1">
+          <button type="button" data-tier-tab="1" class="tier-tab-btn px-4 py-2 rounded-md text-xs sm:text-sm font-mono font-bold bg-cs-orange text-black transition-colors" data-i18n="tab_tier_1">
+            Тир 1 (Tier 1)
+          </button>
+          <button type="button" data-tier-tab="2" class="tier-tab-btn px-4 py-2 rounded-md text-xs sm:text-sm font-mono font-bold text-cs-muted hover:text-white transition-colors" data-i18n="tab_tier_2">
+            Тир 2 (Tier 2)
+          </button>
+          <button type="button" data-tier-tab="3" class="tier-tab-btn px-4 py-2 rounded-md text-xs sm:text-sm font-mono font-bold text-cs-muted hover:text-white transition-colors" data-i18n="tab_tier_3">
+            Тир 3 (Tier 3)
+          </button>
+        </div>
+        <div id="tier-count-label" class="text-xs font-mono text-cs-muted">
+          <!-- Заполняется через JS -->
+        </div>
+      </div>
+
+      <!-- Единый вертикальный контейнер тир-листа -->
+      <div class="rounded-xl border border-cs-border bg-cs-surface overflow-hidden">
+        <!-- Заголовок таблицы рейтинга -->
+        <div class="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3 border-b border-cs-border bg-cs-card/60 text-[11px] font-mono uppercase tracking-wider text-cs-muted">
+          <div class="col-span-2 sm:col-span-1">#</div>
+          <div class="col-span-6 sm:col-span-5" data-i18n="th_player_team">Игрок / Команда</div>
+          <div class="hidden sm:block sm:col-span-2" data-i18n="th_role">Роль</div>
+          <div class="hidden md:block md:col-span-2 text-right">HLTV 2.1</div>
+          <div class="col-span-4 sm:col-span-2 text-right text-cs-orange">K/D ↓</div>
+        </div>
+
+        <!-- Вертикальный список игроков -->
+        <div id="tierlist-container" class="divide-y divide-cs-border">
+          <!-- Генерируется JS по убыванию K/D -->
+        </div>
+      </div>
+
+      <!-- Пустое состояние поиска в тир-листе -->
+      <div id="tierlist-empty" class="hidden rounded-xl border border-cs-border bg-cs-surface p-8 text-center mt-4">
+        <p class="text-sm text-cs-muted" data-i18n="tier_empty_search">По вашему запросу игроки не найдены.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Раздел 4: Тир-лист команд CS2 -->
+  <section id="team-tierlist" class="py-14 sm:py-20 bg-cs-surface/40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+        <div>
+          <span class="text-xs font-mono uppercase tracking-wider text-cs-orange" data-i18n="sec_teams_tag">04 / РЕЙТИНГ ОРГАНИЗАЦИЙ</span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-white mt-1" data-i18n="sec_teams_title">Тир-лист команд CS2</h2>
+          <p class="text-sm text-cs-muted mt-2 max-w-2xl" data-i18n="sec_teams_desc">
+            Сравнение лучших составов по результатам текущего сезона (трофеи и винрейт на картах) и историческому наследию за всё время.
+          </p>
+        </div>
+
+        <!-- Поиск по командам -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="team-search" type="text" placeholder="Поиск команды или региона..." class="px-3.5 py-2 rounded-lg bg-cs-surface border border-cs-border text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cs-orange">
+        </div>
+      </div>
+
+      <!-- Вкладки разделов команд: [Команды сезона] / [Команды за всё время] -->
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div class="inline-flex rounded-lg border border-cs-border bg-cs-surface p-1">
+          <button type="button" data-team-tab="season" class="team-tab-btn px-4 py-2 rounded-md text-xs sm:text-sm font-mono font-bold bg-cs-orange text-black transition-colors" data-i18n="tab_teams_season">
+            Команды сезона
+          </button>
+          <button type="button" data-team-tab="alltime" class="team-tab-btn px-4 py-2 rounded-md text-xs sm:text-sm font-mono font-bold text-cs-muted hover:text-white transition-colors" data-i18n="tab_teams_alltime">
+            Команды за всё время
+          </button>
+        </div>
+        <div id="team-sort-hint" class="text-xs font-mono text-cs-muted">
+          <!-- Заполняется через JS -->
+        </div>
+      </div>
+
+      <!-- Таблица тир-листа команд -->
+      <div class="rounded-xl border border-cs-border bg-cs-surface overflow-hidden">
+        <div id="team-table-header" class="grid grid-cols-12 gap-2 px-4 sm:px-6 py-3 border-b border-cs-border bg-cs-card/60 text-[11px] font-mono uppercase tracking-wider text-cs-muted">
+          <!-- Заполняется через JS в зависимости от вкладки -->
+        </div>
+
+        <div id="team-tierlist-container" class="divide-y divide-cs-border">
+          <!-- Генерируется через JS -->
+        </div>
+      </div>
+
+      <!-- Пустое состояние поиска команд -->
+      <div id="team-tierlist-empty" class="hidden rounded-xl border border-cs-border bg-cs-surface p-8 text-center mt-4">
+        <p class="text-sm text-cs-muted" data-i18n="team_empty_search">По вашему запросу команды не найдены.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Футер -->
+  <footer class="border-t border-cs-border bg-cs-surface py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-cs-muted">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-white">CS2<span class="text-cs-orange">pros</span></span>
+        <span>•</span>
+        <span data-i18n="footer_copy">Аналитическая платформа для игроков Counter-Strike 2</span>
+      </div>
+      <div class="font-mono text-zinc-500">
+        STEAM & FACEIT SYNC ENGINE v2.4
+      </div>
+    </div>
+  </footer>
+
+  <!-- Модальное окно деталей игрока из тир-листа -->
+  <div id="player-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div class="w-full max-w-md rounded-xl border border-cs-border bg-cs-surface p-6 shadow-2xl fade-in">
+      <div class="flex items-start justify-between border-b border-cs-border pb-4 mb-5">
+        <div class="flex items-center gap-3">
+          <div id="modal-avatar" class="w-12 h-12 rounded-lg bg-cs-orange text-black font-extrabold text-lg flex items-center justify-center">
+            Z
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="modal-nick" class="text-xl font-bold text-white">ZywOo</h3>
+              <span id="modal-tier-badge" class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cs-orange text-black">S-TIER</span>
+            </div>
+            <p id="modal-team-role" class="text-xs text-cs-muted mt-0.5">Team Vitality • AWPer</p>
+          </div>
+        </div>
+        <button id="close-modal-btn" type="button" class="p-1.5 rounded-lg text-cs-muted hover:text-white hover:bg-cs-card transition-colors" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Показатели про-игрока -->
+      <div class="grid grid-cols-3 gap-3 mb-6">
+        <div class="p-3 rounded-lg bg-cs-bg border border-cs-border text-center">
+          <span class="text-[11px] text-cs-muted block">HLTV Rating</span>
+          <span id="modal-rating" class="text-lg font-mono font-bold text-cs-orange mt-0.5 block">1.35</span>
+        </div>
+        <div class="p-3 rounded-lg bg-cs-bg border border-cs-border text-center">
+          <span class="text-[11px] text-cs-muted block">K/D Ratio</span>
+          <span id="modal-kd" class="text-lg font-mono font-bold text-white mt-0.5 block">1.38</span>
+        </div>
+        <div class="p-3 rounded-lg bg-cs-bg border border-cs-border text-center">
+          <span class="text-[11px] text-cs-muted block">Headshots</span>
+          <span id="modal-hs" class="text-lg font-mono font-bold text-white mt-0.5 block">41.2%</span>
+        </div>
+      </div>
+
+      <!-- Смена тира пользователем -->
+      <div>
+        <label class="block text-xs font-medium text-cs-muted mb-2" data-i18n="modal_change_tier">Переместить игрока в другой дивизион:</label>
+        <div class="grid grid-cols-3 gap-2" id="modal-tier-buttons">
+          <button type="button" data-tier="1" class="tier-select-btn py-2 rounded-lg border border-cs-border text-xs font-mono font-bold hover:border-cs-orange transition-colors">TIER 1</button>
+          <button type="button" data-tier="2" class="tier-select-btn py-2 rounded-lg border border-cs-border text-xs font-mono font-bold hover:border-cs-orange transition-colors">TIER 2</button>
+          <button type="button" data-tier="3" class="tier-select-btn py-2 rounded-lg border border-cs-border text-xs font-mono font-bold hover:border-cs-orange transition-colors">TIER 3</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * CS2pros — Логика приложения
+     * Хранение данных в localStorage, двуязычный интерфейс (RU/EN),
+     * синхронизация Steam/FACEIT, подсчет K/D и вертикальный тир-лист по K/D.
+     */
+
+    const STORAGE_KEY = 'cs2pros_state_v2';
+
+    // Словарь переводов RU / EN
+    const i18n = {
+      ru: {
+        nav_accounts: 'Аккаунты',
+        nav_stats: 'Статистика и K/D',
+        nav_tierlist: 'Тир-лист игроков',
+        nav_teams: 'Тир-лист команд',
+        btn_connect_header: 'Подключить',
+        btn_connected_header: 'Профиль активен',
+        hero_badge: 'FACEIT & STEAM ТЕЛЕМЕТРИЯ',
+        hero_title: 'Твой единый профиль и аналитика в <span class="text-cs-orange">Counter-Strike 2</span>',
+        hero_subtitle: 'Объедини статистику Steam Premier и матчей FACEIT в одном окне. Точный расчёт K/D, учёт убийств в голову и актуальный тир-лист лучших игроков мира без лишнего шума.',
+        hero_cta_primary: 'Привязать Steam / FACEIT',
+        hero_cta_secondary: 'Открыть тир-лист PRO',
+        hero_card_label: 'АКТИВНЫЙ ПРОФИЛЬ',
+        guest_player: 'Профиль не привязан',
+        metric_kd: 'Общий K/D',
+        metric_kills: 'Убийства',
+        status_disconnected: 'Не подключен',
+        status_connected: 'Подключен',
+        sec_acc_tag: '01 / ИНТЕГРАЦИЯ',
+        sec_acc_title: 'Подключение игровых аккаунтов',
+        sec_acc_desc: 'Введите ваш никнейм или ссылку на профиль для синхронизации матчей. Данные сохраняются локально в вашем браузере.',
+        btn_demo_fill: 'Загрузить демо-профиль',
+        steam_sub: 'Premier рейтинг и официальные матчи',
+        faceit_sub: 'Уровень ELO, история матчей 128-tick',
+        badge_offline: 'Офлайн',
+        badge_online: 'Синхронизирован',
+        steam_label: 'Steam ID64 или Custom URL',
+        faceit_label: 'Никнейм на FACEIT',
+        btn_connect_steam: 'Подключить Steam',
+        btn_connect_faceit: 'Подключить FACEIT',
+        btn_disconnect: 'Отключить',
+        sec_stats_tag: '02 / ТЕЛЕМЕТРИЯ И K/D',
+        sec_stats_title: 'Подсчёт убийств и эффективности',
+        sec_stats_desc: 'Сводка по подключенным аккаунтам. Вы также можете вручную добавить результат сыгранного матча для перерасчёта актуального K/D.',
+        filter_all: 'Все матчи',
+        empty_stats_title: 'Нет данных для расчёта K/D',
+        empty_stats_desc: 'Подключите аккаунт Steam или FACEIT выше, чтобы загрузить историю убийств и смертей, или загрузите демо-профиль для проверки.',
+        empty_stats_btn: 'Перейти к подключению',
+        stat_total_kills: 'Всего убийств (Kills)',
+        stat_total_deaths: 'Всего смертей (Deaths)',
+        stat_matches_count: 'За все учтённые игры',
+        stat_kd_ratio: 'Коэффициент K/D',
+        stat_hs_pct: 'Процент хедшотов',
+        calc_title: 'Добавить матч в статистику',
+        calc_desc: 'Запишите результат последней игры, чтобы мгновенно пересчитать ваш общий K/D.',
+        calc_platform: 'Платформа',
+        calc_map: 'Карта',
+        calc_kills: 'Убийства (K)',
+        calc_deaths: 'Смерти (D)',
+        calc_submit: 'Добавить и пересчитать K/D',
+        recent_matches_title: 'История учтённых матчей',
+        th_source: 'Платформа',
+        th_map: 'Карта',
+        sec_tier_tag: '03 / РЕЙТИНГ ПРО-СЦЕНЫ',
+        sec_tier_title: 'Рейтинг про-игроков CS2 по K/D',
+        sec_tier_desc: 'Единый вертикальный тир-лист с автоматической сортировкой по коэффициенту K/D. Переключайтесь между дивизионами Tier 1, Tier 2 и Tier 3 или нажмите на игрока для смены его тира.',
+        tab_tier_1: 'Тир 1 (Tier 1)',
+        tab_tier_2: 'Тир 2 (Tier 2)',
+        tab_tier_3: 'Тир 3 (Tier 3)',
+        th_player_team: 'Игрок / Команда',
+        th_role: 'Роль',
+        role_all: 'Все роли',
+        btn_reset_tiers: 'Сбросить тиры',
+        tier_empty_search: 'В этом дивизионе игроки по вашему запросу не найдены.',
+        sec_teams_tag: '04 / РЕЙТИНГ ОРГАНИЗАЦИЙ',
+        sec_teams_title: 'Тир-лист команд CS2',
+        sec_teams_desc: 'Сравнение лучших составов по результатам текущего сезона (трофеи и винрейт на картах) и историческому наследию за всё время.',
+        tab_teams_season: 'Команды сезона',
+        tab_teams_alltime: 'Команды за всё время',
+        team_empty_search: 'По вашему запросу команды не найдены.',
+        footer_copy: 'Аналитическая платформа для игроков Counter-Strike 2',
+        modal_change_tier: 'Переместить игрока в другой дивизион:',
+        err_empty_input: 'Поле не может быть пустым. Введите никнейм или ID.',
+        err_short_input: 'Слишком короткое значение (минимум 3 символа).',
+        toast_steam_ok: 'Аккаунт Steam успешно подключен',
+        toast_faceit_ok: 'Аккаунт FACEIT успешно подключен',
+        toast_disconnected: 'Аккаунт отключен',
+        toast_match_added: 'Матч добавлен, K/D пересчитан',
+        toast_tier_updated: 'Дивизион игрока обновлён',
+        toast_tiers_reset: 'Тир-лист сброшен к стандартным значениям',
+        toast_demo_loaded: 'Демо-профиль успешно загружен'
+      },
+      en: {
+        nav_accounts: 'Accounts',
+        nav_stats: 'Stats & K/D',
+        nav_tierlist: 'Pro Tier List',
+        nav_teams: 'Team Tier List',
+        btn_connect_header: 'Connect',
+        btn_connected_header: 'Profile Active',
+        hero_badge: 'FACEIT & STEAM TELEMETRY',
+        hero_title: 'Your unified profile and analytics for <span class="text-cs-orange">Counter-Strike 2</span>',
+        hero_subtitle: 'Combine Steam Premier stats and FACEIT match history in one dashboard. Accurate K/D calculation, headshot tracking, and an interactive CS2 pro tier list.',
+        hero_cta_primary: 'Link Steam / FACEIT',
+        hero_cta_secondary: 'Explore PRO Tier List',
+        hero_card_label: 'ACTIVE PROFILE',
+        guest_player: 'No profile linked',
+        metric_kd: 'Overall K/D',
+        metric_kills: 'Total Kills',
+        status_disconnected: 'Disconnected',
+        status_connected: 'Connected',
+        sec_acc_tag: '01 / INTEGRATION',
+        sec_acc_title: 'Connect Gaming Accounts',
+        sec_acc_desc: 'Enter your nickname or profile ID to synchronize matches. All data is stored locally in your browser.',
+        btn_demo_fill: 'Load Demo Profile',
+        steam_sub: 'Premier Rating & Official Matchmaking',
+        faceit_sub: 'ELO Level & 128-tick Match History',
+        badge_offline: 'Offline',
+        badge_online: 'Synced',
+        steam_label: 'Steam ID64 or Custom URL',
+        faceit_label: 'FACEIT Nickname',
+        btn_connect_steam: 'Connect Steam',
+        btn_connect_faceit: 'Connect FACEIT',
+        btn_disconnect: 'Disconnect',
+        sec_stats_tag: '02 / TELEMETRY & K/D',
+        sec_stats_title: 'Kills & K/D Ratio Tracker',
+        sec_stats_desc: 'Aggregated telemetry from your linked accounts. You can also log a recent match manually to recalculate your live K/D.',
+        filter_all: 'All Matches',
+        empty_stats_title: 'No Data for K/D Calculation',
+        empty_stats_desc: 'Connect your Steam or FACEIT account above to pull kill/death history, or load a demo profile to test the dashboard.',
+        empty_stats_btn: 'Go to Connections',
+        stat_total_kills: 'Total Kills',
+        stat_total_deaths: 'Total Deaths',
+        stat_matches_count: 'Across tracked matches',
+        stat_kd_ratio: 'K/D Ratio',
+        stat_hs_pct: 'Headshot Percentage',
+        calc_title: 'Log Match to Stats',
+        calc_desc: 'Record your latest match score to immediately recalculate your overall K/D.',
+        calc_platform: 'Platform',
+        calc_map: 'Map',
+        calc_kills: 'Kills (K)',
+        calc_deaths: 'Deaths (D)',
+        calc_submit: 'Add & Recalculate K/D',
+        recent_matches_title: 'Tracked Match History',
+        th_source: 'Platform',
+        th_map: 'Map',
+        sec_tier_tag: '03 / PRO SCENE RANKING',
+        sec_tier_title: 'CS2 Pro Players Ranking by K/D',
+        sec_tier_desc: 'Unified vertical tier list sorted descending by K/D ratio. Switch between Tier 1, Tier 2, and Tier 3 divisions or click any player to reassign their tier.',
+        tab_tier_1: 'Tier 1 / Тир 1',
+        tab_tier_2: 'Tier 2 / Тир 2',
+        tab_tier_3: 'Tier 3 / Тир 3',
+        th_player_team: 'Player / Team',
+        th_role: 'Role',
+        role_all: 'All Roles',
+        btn_reset_tiers: 'Reset Tiers',
+        tier_empty_search: 'No players found in this division matching your criteria.',
+        sec_teams_tag: '04 / ORGANIZATIONS RANKING',
+        sec_teams_title: 'CS2 Teams Tier List',
+        sec_teams_desc: 'Ranking top rosters by current season dominance (trophies & map winrate) and all-time historical legacy.',
+        tab_teams_season: 'Teams of the Season',
+        tab_teams_alltime: 'All-Time Teams',
+        team_empty_search: 'No teams found matching your search.',
+        footer_copy: 'Analytics platform built for Counter-Strike 2 players',
+        modal_change_tier: 'Move player to another division:',
+        err_empty_input: 'Field cannot be empty. Enter a nickname or ID.',
+        err_short_input: 'Input is too short (minimum 3 characters).',
+        toast_steam_ok: 'Steam account connected successfully',
+        toast_faceit_ok: 'FACEIT account connected successfully',
+        toast_disconnected: 'Account disconnected',
+        toast_match_added: 'Match logged, K/D recalculated',
+        toast_tier_updated: 'Player division updated',
+        toast_tiers_reset: 'Tier list reset to defaults',
+        toast_demo_loaded: 'Demo profile loaded successfully'
+      }
+    };
+
+    // Расширенный список про-игроков CS2 (Tier 1, Tier 2, Tier 3)
+    const DEFAULT_PRO_PLAYERS = [
+      // TIER 1 (Расширенный состав мировой элиты)
+      { id: 'donk', nick: 'donk', team: 'Team Spirit', role: 'Rifler', tier: '1', rating: '1.37', kd: '1.41', hs: '61.4%' },
+      { id: 'zywoo', nick: 'ZywOo', team: 'Team Vitality', role: 'AWPer', tier: '1', rating: '1.35', kd: '1.39', hs: '41.2%' },
+      { id: 'm0nesy', nick: 'm0NESY', team: 'G2 Esports', role: 'AWPer', tier: '1', rating: '1.31', kd: '1.34', hs: '38.9%' },
+      { id: 'sh1ro', nick: 'sh1ro', team: 'Team Spirit', role: 'AWPer', tier: '1', rating: '1.19', kd: '1.28', hs: '31.4%' },
+      { id: 'niko', nick: 'NiKo', team: 'G2 Esports', role: 'Rifler', tier: '1', rating: '1.22', kd: '1.21', hs: '54.8%' },
+      { id: 'torzsi', nick: 'torzsi', team: 'MOUZ', role: 'AWPer', tier: '1', rating: '1.16', kd: '1.20', hs: '35.6%' },
+      { id: 'ropz', nick: 'ropz', team: 'FaZe Clan', role: 'Rifler', tier: '1', rating: '1.14', kd: '1.18', hs: '55.0%' },
+      { id: 'b1t', nick: 'b1t', team: 'Natus Vincere', role: 'Rifler', tier: '1', rating: '1.15', kd: '1.17', hs: '66.5%' },
+      { id: 'broky', nick: 'broky', team: 'FaZe Clan', role: 'AWPer', tier: '1', rating: '1.11', kd: '1.16', hs: '34.2%' },
+      { id: 'jl', nick: 'jL', team: 'Natus Vincere', role: 'Rifler', tier: '1', rating: '1.16', kd: '1.15', hs: '52.1%' },
+      { id: 'w0nderful', nick: 'w0nderful', team: 'Natus Vincere', role: 'AWPer', tier: '1', rating: '1.13', kd: '1.15', hs: '37.8%' },
+      { id: 'xantares', nick: 'XANTARES', team: 'Eternal Fire', role: 'Rifler', tier: '1', rating: '1.18', kd: '1.14', hs: '58.9%' },
+      { id: 'flamez', nick: 'flameZ', team: 'Team Vitality', role: 'Rifler', tier: '1', rating: '1.13', kd: '1.13', hs: '53.4%' },
+      { id: 'spinx', nick: 'Spinx', team: 'Team Vitality', role: 'Rifler', tier: '1', rating: '1.12', kd: '1.13', hs: '51.7%' },
+      { id: 'frozen', nick: 'frozen', team: 'FaZe Clan', role: 'Rifler', tier: '1', rating: '1.12', kd: '1.12', hs: '50.2%' },
+      { id: 'jimpphat', nick: 'Jimpphat', team: 'MOUZ', role: 'Rifler', tier: '1', rating: '1.14', kd: '1.12', hs: '56.1%' },
+      { id: 'elige', nick: 'EliGE', team: 'Complexity', role: 'Rifler', tier: '1', rating: '1.15', kd: '1.11', hs: '54.0%' },
+      { id: 'malbsmd', nick: 'malbsMd', team: 'G2 Esports', role: 'Rifler', tier: '1', rating: '1.13', kd: '1.10', hs: '59.3%' },
+      { id: 'chopper', nick: 'chopper', team: 'Team Spirit', role: 'IGL', tier: '1', rating: '0.99', kd: '0.97', hs: '51.2%' },
+      { id: 'aleksib', nick: 'Aleksib', team: 'Natus Vincere', role: 'IGL', tier: '1', rating: '0.98', kd: '0.96', hs: '49.3%' },
+      { id: 'karrigan', nick: 'karrigan', team: 'FaZe Clan', role: 'IGL', tier: '1', rating: '0.94', kd: '0.91', hs: '46.7%' },
+
+      // TIER 2
+      { id: 'jame', nick: 'Jame', team: 'Virtus.pro', role: 'AWPer', tier: '2', rating: '1.10', kd: '1.22', hs: '31.0%' },
+      { id: 'senzu', nick: 'Senzu', team: 'The MongolZ', role: 'Rifler', tier: '2', rating: '1.15', kd: '1.16', hs: '57.8%' },
+      { id: '910', nick: '910', team: 'The MongolZ', role: 'AWPer', tier: '2', rating: '1.12', kd: '1.15', hs: '36.4%' },
+      { id: 'woxic', nick: 'woxic', team: 'Eternal Fire', role: 'AWPer', tier: '2', rating: '1.10', kd: '1.14', hs: '34.9%' },
+      { id: 'insani', nick: 'insani', team: 'MIBR', role: 'Rifler', tier: '2', rating: '1.14', kd: '1.12', hs: '55.6%' },
+      { id: 'heavygod', nick: 'HeavyGod', team: 'Cloud9', role: 'Rifler', tier: '2', rating: '1.11', kd: '1.10', hs: '52.8%' },
+      { id: 'blamef', nick: 'blameF', team: 'fnatic', role: 'Rifler', tier: '2', rating: '1.13', kd: '1.10', hs: '48.5%' },
+      { id: 'blitz', nick: 'bLitz', team: 'The MongolZ', role: 'IGL', tier: '2', rating: '1.05', kd: '1.03', hs: '50.1%' },
+
+      // TIER 3
+      { id: 'deko', nick: 'deko', team: 'Aurora', role: 'AWPer', tier: '3', rating: '1.12', kd: '1.19', hs: '33.7%' },
+      { id: 'regali', nick: 'regali', team: 'OG', role: 'AWPer', tier: '3', rating: '1.09', kd: '1.14', hs: '35.1%' },
+      { id: 'r3salt', nick: 'r3salt', team: '9 Pandas', role: 'Rifler', tier: '3', rating: '1.10', kd: '1.09', hs: '54.2%' },
+      { id: 'zorte', nick: 'zorte', team: 'BetBoom', role: 'AWPer', tier: '3', rating: '1.06', kd: '1.08', hs: '32.9%' },
+      { id: 'sdy', nick: 'sdy', team: 'ENCE', role: 'Rifler', tier: '3', rating: '1.04', kd: '1.04', hs: '51.5%' },
+      { id: 'nafany', nick: 'nafany', team: 'BetBoom', role: 'IGL', tier: '3', rating: '0.96', kd: '0.94', hs: '49.0%' }
+    ];
+
+    // Данные команд для разделов "Команды сезона" и "Команды за всё время"
+    const SEASON_TEAMS = [
+      { id: 'vitality', name: 'Team Vitality', tag: 'VIT', region: 'Europe', seasonTrophies: 7, mapWinrate: 76.4, bestMap: 'Nuke (84%)' },
+      { id: 'spirit', name: 'Team Spirit', tag: 'SPIRIT', region: 'CIS', seasonTrophies: 3, mapWinrate: 71.8, bestMap: 'Dust2 (82%)' },
+      { id: 'furia', name: 'FURIA Esports', tag: 'FURIA', region: 'Brazil', seasonTrophies: 3, mapWinrate: 68.5, bestMap: 'Inferno (77%)' },
+      { id: 'navi', name: 'Natus Vincere', tag: 'NAVI', region: 'Europe', seasonTrophies: 2, mapWinrate: 66.2, bestMap: 'Ancient (75%)' },
+      { id: 'mouz', name: 'MOUZ', tag: 'MOUZ', region: 'Europe', seasonTrophies: 2, mapWinrate: 65.9, bestMap: 'Mirage (74%)' },
+      { id: 'legacy', name: 'Legacy', tag: 'LGC', region: 'Brazil', seasonTrophies: 2, mapWinrate: 63.1, bestMap: 'Anubis (71%)' },
+      { id: 'falcons', name: 'Team Falcons', tag: 'FLC', region: 'Europe', seasonTrophies: 1, mapWinrate: 64.7, bestMap: 'Mirage (73%)' },
+      { id: 'parivision', name: 'PARIVISION', tag: 'PARI', region: 'CIS', seasonTrophies: 1, mapWinrate: 61.4, bestMap: 'Ancient (70%)' }
+    ];
+
+    const ALLTIME_TEAMS = [
+      { id: 'astralis', name: 'Astralis', tag: 'AST', region: 'Denmark', majors: 4, totalTrophies: 32, era: '2017–2020 Golden Era' },
+      { id: 'navi_all', name: 'Natus Vincere', tag: 'NAVI', region: 'CIS / EU', majors: 2, totalTrophies: 27, era: '2010–2026 Legacy' },
+      { id: 'fnatic', name: 'fnatic', tag: 'FNC', region: 'Sweden', majors: 3, totalTrophies: 24, era: '2013–2016 Dynasty' },
+      { id: 'faze_all', name: 'FaZe Clan', tag: 'FAZE', region: 'Europe', majors: 1, totalTrophies: 21, era: 'Grand Slam S4' },
+      { id: 'sk_lg', name: 'SK Gaming / Luminosity', tag: 'SK', region: 'Brazil', majors: 2, totalTrophies: 18, era: '2016–2017 Dominance' },
+      { id: 'nip', name: 'Ninjas in Pyjamas', tag: 'NIP', region: 'Sweden', majors: 1, totalTrophies: 17, era: '87-0 LAN Streak' },
+      { id: 'liquid', name: 'Team Liquid', tag: 'TL', region: 'North America', majors: 0, totalTrophies: 15, era: '63-Day Grand Slam' },
+      { id: 'vitality_all', name: 'Team Vitality', tag: 'VIT', region: 'Europe', majors: 1, totalTrophies: 14, era: 'Paris Major & CS2' }
+    ];
+
+    // Состояние приложения
+    let state = {
+      lang: 'ru',
+      steam: null,   // { id: string, premier: number }
+      faceit: null,  // { nick: string, elo: number, level: number }
+      matches: [],   // [{ id, source, map, kills, deaths, hs }]
+      sourceFilter: 'all',
+      activeTierTab: '1', // '1' | '2' | '3'
+      activeTeamTab: 'season', // 'season' | 'alltime'
+      players: JSON.parse(JSON.stringify(DEFAULT_PRO_PLAYERS)),
+      selectedPlayerId: null
+    };
+
+    // Загрузка из localStorage
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          state = { ...state, ...parsed };
+          if (!Array.isArray(state.players) || state.players.length === 0) {
+            state.players = JSON.parse(JSON.stringify(DEFAULT_PRO_PLAYERS));
+          }
+        }
+      } catch (e) {
+        console.error('Ошибка чтения localStorage:', e);
+      }
+    }
+
+    // Сохранение в localStorage
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error('Ошибка записи в localStorage:', e);
+      }
+    }
+
+    // Показ Toast-уведомлений
+    function showToast(messageKey, isError = false) {
+      const container = document.getElementById('toast-container');
+      const text = i18n[state.lang][messageKey] || messageKey;
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto px-4 py-3 rounded-lg border text-xs font-medium shadow-xl flex items-center gap-2.5 fade-in ${
+        isError 
+          ? 'bg-zinc-950 border-red-500/50 text-red-400' 
+          : 'bg-zinc-950 border-cs-orange/60 text-white'
+      }`;
+      toast.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${isError ? 'bg-red-500' : 'bg-cs-orange'} shrink-0"></span>
+        <span>${text}</span>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.2s ease';
+        setTimeout(() => toast.remove(), 200);
+      }, 3000);
+    }
+
+    // Применение локализации
+    function applyLanguage() {
+      const dict = i18n[state.lang];
+      document.documentElement.lang = state.lang;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.innerHTML = dict[key];
+        }
+      });
+
+      // Обновление плейсхолдеров
+      const tierSearch = document.getElementById('tier-search');
+      if (tierSearch) {
+        tierSearch.placeholder = state.lang === 'ru' ? 'Поиск игрока или команды...' : 'Search player or team...';
+      }
+      const faceitInput = document.getElementById('faceit-input');
+      if (faceitInput) {
+        faceitInput.placeholder = state.lang === 'ru' ? 'Например: s1mple или m0NESY' : 'e.g. s1mple or m0NESY';
+      }
+      const teamSearch = document.getElementById('team-search');
+      if (teamSearch) {
+        teamSearch.placeholder = state.lang === 'ru' ? 'Поиск команды или региона...' : 'Search team or region...';
+      }
+      renderTierList();
+      renderTeamTierList();
+    }
+
+    // Генерация реалистичных стартовых матчей при привязке аккаунта
+    function generatePlatformMatches(source, seedName) {
+      const maps = ['Mirage', 'Inferno', 'Ancient', 'Anubis', 'Nuke', 'Dust2'];
+      let hash = 0;
+      for (let i = 0; i < seedName.length; i++) {
+        hash = seedName.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const generated = [];
+      for (let i = 0; i < 4; i++) {
+        const val = Math.abs(hash + i * 37);
+        const kills = 14 + (val % 18); // 14..31
+        const deaths = 11 + ((val >> 2) % 12); // 11..22
+        const hs = 38 + (val % 32); // 38..69%
+        generated.push({
+          id: `${source}_${Date.now()}_${i}`,
+          source,
+          map: maps[(val + i) % maps.length],
+          kills,
+          deaths,
+          hs
+        });
+      }
+      return generated;
+    }
+
+    // Обновление UI карточек аккаунтов и Hero-блока
+    function renderAccountsAndHero() {
+      const dict = i18n[state.lang];
+      const hasSteam = Boolean(state.steam);
+      const hasFaceit = Boolean(state.faceit);
+
+      // Header кнопка
+      const headerBtnText = document.querySelector('#header-connect-btn span:last-child');
+      const headerDot = document.getElementById('header-status-dot');
+      if (hasSteam || hasFaceit) {
+        headerBtnText.textContent = dict.btn_connected_header;
+        headerDot.classList.remove('bg-black');
+        headerDot.classList.add('bg-emerald-950');
+      } else {
+        headerBtnText.textContent = dict.btn_connect_header;
+      }
+
+      // Hero карточка
+      const heroName = document.getElementById('hero-player-name');
+      const heroElo = document.getElementById('hero-elo-badge');
+      const heroSteam = document.getElementById('hero-steam-status');
+      const heroFaceit = document.getElementById('hero-faceit-status');
+      const steamDot = document.getElementById('steam-dot');
+      const faceitDot = document.getElementById('faceit-dot');
+
+      if (hasFaceit) {
+        heroName.textContent = state.faceit.nick;
+        heroElo.textContent = `FACEIT ELO: ${state.faceit.elo}`;
+        heroElo.classList.add('text-cs-orange', 'border-cs-orange/40');
+      } else if (hasSteam) {
+        heroName.textContent = state.steam.id;
+        heroElo.textContent = `PREMIER: ${state.steam.premier.toLocaleString()}`;
+        heroElo.classList.add('text-cs-orange', 'border-cs-orange/40');
+      } else {
+        heroName.textContent = dict.guest_player;
+        heroElo.textContent = 'ELO: —';
+        heroElo.classList.remove('text-cs-orange', 'border-cs-orange/40');
+      }
+
+      // Steam UI
+      const steamBadge = document.getElementById('steam-badge');
+      const steamInput = document.getElementById('steam-input');
+      const steamDisconnect = document.getElementById('steam-disconnect-btn');
+      const steamInfo = document.getElementById('steam-connected-info');
+      if (hasSteam) {
+        steamBadge.textContent = dict.badge_online;
+        steamBadge.className = 'px-2.5 py-1 rounded text-xs font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+        steamInput.value = state.steam.id;
+        steamInput.disabled = true;
+        steamDisconnect.classList.remove('hidden');
+        steamInfo.classList.remove('hidden');
+        document.getElementById('steam-premier-val').textContent = `${state.steam.premier.toLocaleString()} CSR`;
+        heroSteam.textContent = state.steam.id;
+        heroSteam.className = 'font-mono text-emerald-400';
+        steamDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+      } else {
+        steamBadge.textContent = dict.badge_offline;
+        steamBadge.className = 'px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 text-zinc-400';
+        steamInput.value = '';
+        steamInput.disabled = false;
+        steamDisconnect.classList.add('hidden');
+        steamInfo.classList.add('hidden');
+        heroSteam.textContent = dict.status_disconnected;
+        heroSteam.className = 'font-mono text-zinc-500';
+        steamDot.className = 'w-2 h-2 rounded-full bg-zinc-600';
+      }
+
+      // FACEIT UI
+      const faceitBadge = document.getElementById('faceit-badge');
+      const faceitInput = document.getElementById('faceit-input');
+      const faceitDisconnect = document.getElementById('faceit-disconnect-btn');
+      const faceitInfo = document.getElementById('faceit-connected-info');
+      if (hasFaceit) {
+        faceitBadge.textContent = dict.badge_online;
+        faceitBadge.className = 'px-2.5 py-1 rounded text-xs font-mono bg-cs-orangeMuted text-cs-orange border border-cs-orange/30';
+        faceitInput.value = state.faceit.nick;
+        faceitInput.disabled = true;
+        faceitDisconnect.classList.remove('hidden');
+        faceitInfo.classList.remove('hidden');
+        document.getElementById('faceit-level-val').textContent = `LVL ${state.faceit.level} • ${state.faceit.elo.toLocaleString()} ELO`;
+        heroFaceit.textContent = `${state.faceit.nick} (LVL ${state.faceit.level})`;
+        heroFaceit.className = 'font-mono text-cs-orange';
+        faceitDot.className = 'w-2 h-2 rounded-full bg-cs-orange';
+      } else {
+        faceitBadge.textContent = dict.badge_offline;
+        faceitBadge.className = 'px-2.5 py-1 rounded text-xs font-mono bg-zinc-800 text-zinc-400';
+        faceitInput.value = '';
+        faceitInput.disabled = false;
+        faceitDisconnect.classList.add('hidden');
+        faceitInfo.classList.add('hidden');
+        heroFaceit.textContent = dict.status_disconnected;
+        heroFaceit.className = 'font-mono text-zinc-500';
+        faceitDot.className = 'w-2 h-2 rounded-full bg-zinc-600';
+      }
+    }
+
+    // Расчет и отрисовка статистики K/D
+    function renderStats() {
+      const emptyState = document.getElementById('stats-empty-state');
+      const dashboard = document.getElementById('stats-dashboard');
+
+      // Фильтрация матчей по источнику
+      const filtered = state.sourceFilter === 'all'
+        ? state.matches
+        : state.matches.filter(m => m.source === state.sourceFilter);
+
+      // Общие показатели по всем матчам для Hero-блока
+      const allKills = state.matches.reduce((sum, m) => sum + m.kills, 0);
+      const allDeaths = state.matches.reduce((sum, m) => sum + m.deaths, 0);
+      const allKd = allDeaths > 0 ? (allKills / allDeaths).toFixed(2) : allKills.toFixed(2);
+      const allHs = state.matches.length > 0
+        ? Math.round(state.matches.reduce((sum, m) => sum + m.hs, 0) / state.matches.length)
+        : 0;
+
+      document.getElementById('hero-kd-val').textContent = allKd;
+      document.getElementById('hero-kills-val').textContent = allKills.toLocaleString();
+      document.getElementById('hero-hs-val').textContent = `${allHs}%`;
+
+      if (state.matches.length === 0) {
+        emptyState.classList.remove('hidden');
+        dashboard.classList.add('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      dashboard.classList.remove('hidden');
+
+      // Показатели для активного фильтра
+      const totalKills = filtered.reduce((sum, m) => sum + m.kills, 0);
+      const totalDeaths = filtered.reduce((sum, m) => sum + m.deaths, 0);
+      const kdRatio = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills.toFixed(2);
+      const kdDiff = totalKills - totalDeaths;
+      const avgHs = filtered.length > 0
+        ? Math.round(filtered.reduce((sum, m) => sum + m.hs, 0) / filtered.length)
+        : 0;
+      const kpr = filtered.length > 0 ? (totalKills / (filtered.length * 24)).toFixed(2) : '0.00';
+
+      document.getElementById('stat-kills').textContent = totalKills.toLocaleString();
+      document.getElementById('stat-deaths').textContent = totalDeaths.toLocaleString();
+      document.getElementById('stat-kd').textContent = kdRatio;
+      document.getElementById('stat-hs').textContent = `${avgHs}%`;
+      document.getElementById('stat-kpr').textContent = `${kpr} K/R`;
+
+      const diffEl = document.getElementById('stat-kd-diff');
+      diffEl.textContent = `${kdDiff >= 0 ? '+' : ''}${kdDiff} K/D Diff`;
+      diffEl.className = `text-xs font-mono mt-1 block ${kdDiff >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+
+      // Отрисовка таблицы матчей
+      const tbody = document.getElementById('matches-table-body');
+      const counter = document.getElementById('matches-counter');
+      counter.textContent = state.lang === 'ru' ? `${filtered.length} матчей` : `${filtered.length} matches`;
+
+      tbody.innerHTML = filtered.slice().reverse().map(m => {
+        const mKd = m.deaths > 0 ? (m.kills / m.deaths).toFixed(2) : m.kills.toFixed(2);
+        const isPositive = parseFloat(mKd) >= 1.0;
+        return `
+          <tr class="hover:bg-cs-card/60 transition-colors">
+            <td class="py-3 pr-3">
+              <span class="px-2 py-0.5 rounded text-[11px] font-mono uppercase ${
+                m.source === 'faceit' ? 'bg-cs-orangeMuted text-cs-orange' : 'bg-zinc-800 text-zinc-300'
+              }">${m.source}</span>
+            </td>
+            <td class="py-3 px-3 font-medium text-white">${m.map}</td>
+            <td class="py-3 px-3 font-mono text-cs-muted">${m.kills} / ${m.deaths}</td>
+            <td class="py-3 px-3 font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}">${mKd}</td>
+            <td class="py-3 pl-3 text-right font-mono text-cs-muted">${m.hs}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Отрисовка единого вертикального тир-листа про-игроков по убыванию K/D
+    function renderTierList() {
+      const container = document.getElementById('tierlist-container');
+      const wrapper = container.parentElement;
+      const emptyBox = document.getElementById('tierlist-empty');
+      const countLabel = document.getElementById('tier-count-label');
+      const searchQuery = document.getElementById('tier-search').value.trim().toLowerCase();
+      const roleFilter = document.getElementById('tier-role-filter').value;
+
+      // Синхронизация визуала вкладок Tier 1 / Tier 2 / Tier 3
+      document.querySelectorAll('.tier-tab-btn').forEach(btn => {
+        const tab = btn.getAttribute('data-tier-tab');
+        if (tab === state.activeTierTab) {
+          btn.classList.add('bg-cs-orange', 'text-black');
+          btn.classList.remove('text-cs-muted', 'hover:text-white');
+        } else {
+          btn.classList.remove('bg-cs-orange', 'text-black');
+          btn.classList.add('text-cs-muted', 'hover:text-white');
+        }
+      });
+
+      // Фильтрация по активному тиру, поиску и роли + сортировка вниз по убыванию K/D
+      const filteredPlayers = state.players
+        .filter(p => {
+          const matchesTier = String(p.tier) === String(state.activeTierTab);
+          const matchesSearch = p.nick.toLowerCase().includes(searchQuery) || p.team.toLowerCase().includes(searchQuery);
+          const matchesRole = roleFilter === 'all' || p.role === roleFilter;
+          return matchesTier && matchesSearch && matchesRole;
+        })
+        .sort((a, b) => parseFloat(b.kd) - parseFloat(a.kd));
+
+      countLabel.textContent = state.lang === 'ru'
+        ? `TIER ${state.activeTierTab} • ${filteredPlayers.length} игроков`
+        : `TIER ${state.activeTierTab} • ${filteredPlayers.length} players`;
+
+      if (filteredPlayers.length === 0) {
+        container.innerHTML = '';
+        wrapper.classList.add('hidden');
+        emptyBox.classList.remove('hidden');
+        return;
+      }
+
+      wrapper.classList.remove('hidden');
+      emptyBox.classList.add('hidden');
+
+      container.innerHTML = filteredPlayers.map((p, index) => {
+        const rank = index + 1;
+        const isTop3 = rank <= 3;
+        const rankBadgeClass = rank === 1
+          ? 'bg-cs-orange text-black font-extrabold'
+          : isTop3
+            ? 'bg-zinc-200 text-black font-bold'
+            : 'bg-cs-bg border border-cs-border text-cs-muted font-medium';
+
+        return `
+          <button type="button" data-player-id="${p.id}" class="player-row w-full text-left grid grid-cols-12 gap-2 items-center px-4 sm:px-6 py-3.5 hover:bg-cs-card/80 transition-colors group">
+            <!-- Место в тире -->
+            <div class="col-span-2 sm:col-span-1">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded text-xs font-mono ${rankBadgeClass}">
+                ${rank}
+              </span>
+            </div>
+
+            <!-- Никнейм и команда -->
+            <div class="col-span-6 sm:col-span-5 min-w-0 pr-2">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm sm:text-base text-white group-hover:text-cs-orange transition-colors truncate">${p.nick}</span>
+                <span class="sm:hidden text-[10px] font-mono px-1.5 py-0.5 rounded bg-cs-bg border border-cs-border text-cs-muted">${p.role}</span>
+              </div>
+              <p class="text-xs text-cs-muted truncate mt-0.5">${p.team}</p>
+            </div>
+
+            <!-- Роль (Desktop) -->
+            <div class="hidden sm:block sm:col-span-2">
+              <span class="inline-block text-xs font-mono px-2.5 py-1 rounded bg-cs-bg border border-cs-border text-cs-muted">
+                ${p.role}
+              </span>
+            </div>
+
+            <!-- HLTV Rating -->
+            <div class="hidden md:block md:col-span-2 text-right font-mono text-sm text-zinc-300">
+              ${p.rating}
+            </div>
+
+            <!-- K/D Ratio -->
+            <div class="col-span-4 sm:col-span-2 text-right">
+              <span class="font-mono font-extrabold text-sm sm:text-base ${parseFloat(p.kd) >= 1.2 ? 'text-cs-orange' : 'text-white'}">
+                ${p.kd}
+              </span>
+              <span class="block text-[10px] font-mono text-cs-muted">HS ${p.hs}</span>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      // Навешиваем клики на строки игроков
+      document.querySelectorAll('.player-row').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openPlayerModal(btn.getAttribute('data-player-id'));
+        });
+      });
+    }
+
+    // Отрисовка тир-листа команд (Сезон / За всё время)
+    function renderTeamTierList() {
+      const container = document.getElementById('team-tierlist-container');
+      const header = document.getElementById('team-table-header');
+      const wrapper = container.parentElement;
+      const emptyBox = document.getElementById('team-tierlist-empty');
+      const hintLabel = document.getElementById('team-sort-hint');
+      const query = document.getElementById('team-search').value.trim().toLowerCase();
+      const isSeason = state.activeTeamTab === 'season';
+
+      // Переключение стиля вкладок
+      document.querySelectorAll('.team-tab-btn').forEach(btn => {
+        const tab = btn.getAttribute('data-team-tab');
+        if (tab === state.activeTeamTab) {
+          btn.classList.add('bg-cs-orange', 'text-black');
+          btn.classList.remove('text-cs-muted', 'hover:text-white');
+        } else {
+          btn.classList.remove('bg-cs-orange', 'text-black');
+          btn.classList.add('text-cs-muted', 'hover:text-white');
+        }
+      });
+
+      if (isSeason) {
+        hintLabel.textContent = state.lang === 'ru'
+          ? 'Сортировка: Трофеи за сезон и Винрейт на картах ↓'
+          : 'Sorted by: Season Trophies & Map Winrate ↓';
+
+        header.innerHTML = `
+          <div class="col-span-2 sm:col-span-1">#</div>
+          <div class="col-span-5 sm:col-span-4">${state.lang === 'ru' ? 'Команда / Регион' : 'Team / Region'}</div>
+          <div class="hidden md:block md:col-span-3">${state.lang === 'ru' ? 'Сильнейшая карта' : 'Best Map'}</div>
+          <div class="col-span-2 sm:col-span-2 text-right text-cs-orange">${state.lang === 'ru' ? 'Трофеи ↓' : 'Trophies ↓'}</div>
+          <div class="col-span-3 sm:col-span-2 text-right">${state.lang === 'ru' ? 'Винрейт карт' : 'Map Win %'}</div>
+        `;
+
+        const list = SEASON_TEAMS
+          .filter(t => t.name.toLowerCase().includes(query) || t.region.toLowerCase().includes(query) || t.tag.toLowerCase().includes(query))
+          .sort((a, b) => (b.seasonTrophies - a.seasonTrophies) || (b.mapWinrate - a.mapWinrate));
+
+        if (list.length === 0) {
+          container.innerHTML = '';
+          wrapper.classList.add('hidden');
+          emptyBox.classList.remove('hidden');
+          return;
+        }
+
+        wrapper.classList.remove('hidden');
+        emptyBox.classList.add('hidden');
+
+        container.innerHTML = list.map((t, idx) => {
+          const rank = idx + 1;
+          const badgeClass = rank === 1
+            ? 'bg-cs-orange text-black font-extrabold'
+            : rank <= 3
+              ? 'bg-zinc-200 text-black font-bold'
+              : 'bg-cs-bg border border-cs-border text-cs-muted font-medium';
+
+          return `
+            <div class="grid grid-cols-12 gap-2 items-center px-4 sm:px-6 py-4 hover:bg-cs-card/70 transition-colors">
+              <div class="col-span-2 sm:col-span-1">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded text-xs font-mono ${badgeClass}">${rank}</span>
+              </div>
+              <div class="col-span-5 sm:col-span-4 min-w-0 pr-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-sm sm:text-base text-white truncate">${t.name}</span>
+                  <span class="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-cs-bg border border-cs-border text-cs-muted">${t.tag}</span>
+                </div>
+                <p class="text-xs text-cs-muted truncate mt-0.5">${t.region}</p>
+              </div>
+              <div class="hidden md:block md:col-span-3">
+                <span class="text-xs font-mono px-2.5 py-1 rounded bg-cs-bg border border-cs-border text-zinc-300">${t.bestMap}</span>
+              </div>
+              <div class="col-span-2 sm:col-span-2 text-right font-mono font-extrabold text-sm sm:text-base text-cs-orange">
+                ${t.seasonTrophies}
+              </div>
+              <div class="col-span-3 sm:col-span-2 text-right">
+                <span class="font-mono font-bold text-sm text-emerald-400">${t.mapWinrate.toFixed(1)}%</span>
+                <div class="w-full max-w-[80px] ml-auto h-1.5 bg-cs-bg rounded-full overflow-hidden mt-1">
+                  <div class="h-full bg-cs-orange rounded-full" style="width: ${t.mapWinrate}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } else {
+        hintLabel.textContent = state.lang === 'ru'
+          ? 'Сортировка: Общее количество трофеев за всю историю ↓'
+          : 'Sorted by: Total All-Time Trophies ↓';
+
+        header.innerHTML = `
+          <div class="col-span-2 sm:col-span-1">#</div>
+          <div class="col-span-5 sm:col-span-4">${state.lang === 'ru' ? 'Команда / Эпоха' : 'Team / Era'}</div>
+          <div class="hidden md:block md:col-span-3">${state.lang === 'ru' ? 'Регион' : 'Region'}</div>
+          <div class="col-span-2 sm:col-span-2 text-right">${state.lang === 'ru' ? 'Мейджоры' : 'Majors'}</div>
+          <div class="col-span-3 sm:col-span-2 text-right text-cs-orange">${state.lang === 'ru' ? 'Всего трофеев ↓' : 'Trophies ↓'}</div>
+        `;
+
+        const list = ALLTIME_TEAMS
+          .filter(t => t.name.toLowerCase().includes(query) || t.region.toLowerCase().includes(query) || t.tag.toLowerCase().includes(query))
+          .sort((a, b) => (b.totalTrophies - a.totalTrophies) || (b.majors - a.majors));
+
+        if (list.length === 0) {
+          container.innerHTML = '';
+          wrapper.classList.add('hidden');
+          emptyBox.classList.remove('hidden');
+          return;
+        }
+
+        wrapper.classList.remove('hidden');
+        emptyBox.classList.add('hidden');
+
+        container.innerHTML = list.map((t, idx) => {
+          const rank = idx + 1;
+          const badgeClass = rank === 1
+            ? 'bg-cs-orange text-black font-extrabold'
+            : rank <= 3
+              ? 'bg-zinc-200 text-black font-bold'
+              : 'bg-cs-bg border border-cs-border text-cs-muted font-medium';
+
+          return `
+            <div class="grid grid-cols-12 gap-2 items-center px-4 sm:px-6 py-4 hover:bg-cs-card/70 transition-colors">
+              <div class="col-span-2 sm:col-span-1">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded text-xs font-mono ${badgeClass}">${rank}</span>
+              </div>
+              <div class="col-span-5 sm:col-span-4 min-w-0 pr-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-sm sm:text-base text-white truncate">${t.name}</span>
+                  <span class="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded bg-cs-bg border border-cs-border text-cs-muted">${t.tag}</span>
+                </div>
+                <p class="text-xs text-cs-muted truncate mt-0.5">${t.era}</p>
+              </div>
+              <div class="hidden md:block md:col-span-3">
+                <span class="text-xs font-mono px-2.5 py-1 rounded bg-cs-bg border border-cs-border text-cs-muted">${t.region}</span>
+              </div>
+              <div class="col-span-2 sm:col-span-2 text-right">
+                <span class="px-2 py-0.5 rounded text-xs font-mono font-bold ${t.majors >= 3 ? 'bg-cs-orangeMuted text-cs-orange border border-cs-orange/30' : 'bg-cs-bg border border-cs-border text-white'}">
+                  ${t.majors}x Major
+                </span>
+              </div>
+              <div class="col-span-3 sm:col-span-2 text-right font-mono font-extrabold text-sm sm:text-base text-cs-orange">
+                ${t.totalTrophies}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // Модальное окно про-игрока
+    function openPlayerModal(playerId) {
+      const player = state.players.find(p => p.id === playerId);
+      if (!player) return;
+      state.selectedPlayerId = playerId;
+
+      document.getElementById('modal-avatar').textContent = player.nick.charAt(0).toUpperCase();
+      document.getElementById('modal-nick').textContent = player.nick;
+      document.getElementById('modal-tier-badge').textContent = `TIER ${player.tier}`;
+      document.getElementById('modal-team-role').textContent = `${player.team} • ${player.role}`;
+      document.getElementById('modal-rating').textContent = player.rating;
+      document.getElementById('modal-kd').textContent = player.kd;
+      document.getElementById('modal-hs').textContent = player.hs;
+
+      document.querySelectorAll('.tier-select-btn').forEach(btn => {
+        const tier = btn.getAttribute('data-tier');
+        if (String(tier) === String(player.tier)) {
+          btn.classList.add('bg-cs-orange', 'text-black', 'border-cs-orange');
+          btn.classList.remove('text-white');
+        } else {
+          btn.classList.remove('bg-cs-orange', 'text-black', 'border-cs-orange');
+          btn.classList.add('text-white');
+        }
+      });
+
+      const modal = document.getElementById('player-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePlayerModal() {
+      const modal = document.getElementById('player-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      state.selectedPlayerId = null;
+    }
+
+    // Инициализация обработчиков событий
+    function initEvents() {
+      // Переключение языка
+      document.getElementById('lang-toggle').addEventListener('click', () => {
+        state.lang = state.lang === 'ru' ? 'en' : 'ru';
+        saveState();
+        applyLanguage();
+        renderAccountsAndHero();
+        renderStats();
+      });
+
+      // Подключение Steam
+      document.getElementById('steam-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (state.steam) return;
+        const input = document.getElementById('steam-input');
+        const err = document.getElementById('steam-error');
+        const val = input.value.trim();
+
+        if (!val) {
+          err.textContent = i18n[state.lang].err_empty_input;
+          err.classList.remove('hidden');
+          return;
+        }
+        if (val.length < 3) {
+          err.textContent = i18n[state.lang].err_short_input;
+          err.classList.remove('hidden');
+          return;
+        }
+
+        err.classList.add('hidden');
+        const premierRating = 14500 + (val.length * 730) % 11000;
+        state.steam = { id: val, premier: premierRating };
+        state.matches = [...state.matches, ...generatePlatformMatches('steam', val)];
+        saveState();
+        renderAccountsAndHero();
+        renderStats();
+        showToast('toast_steam_ok');
+      });
+
+      // Отключение Steam
+      document.getElementById('steam-disconnect-btn').addEventListener('click', () => {
+        state.steam = null;
+        state.matches = state.matches.filter(m => m.source !== 'steam');
+        saveState();
+        renderAccountsAndHero();
+        renderStats();
+        showToast('toast_disconnected');
+      });
+
+      // Подключение FACEIT
+      document.getElementById('faceit-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (state.faceit) return;
+        const input = document.getElementById('faceit-input');
+        const err = document.getElementById('faceit-error');
+        const val = input.value.trim();
+
+        if (!val) {
+          err.textContent = i18n[state.lang].err_empty_input;
+          err.classList.remove('hidden');
+          return;
+        }
+        if (val.length < 3) {
+          err.textContent = i18n[state.lang].err_short_input;
+          err.classList.remove('hidden');
+          return;
+        }
+
+        err.classList.add('hidden');
+        const elo = 2050 + (val.length * 145) % 1200;
+        state.faceit = { nick: val, elo, level: 10 };
+        state.matches = [...state.matches, ...generatePlatformMatches('faceit', val)];
+        saveState();
+        renderAccountsAndHero();
+        renderStats();
+        showToast('toast_faceit_ok');
+      });
+
+      // Отключение FACEIT
+      document.getElementById('faceit-disconnect-btn').addEventListener('click', () => {
+        state.faceit = null;
+        state.matches = state.matches.filter(m => m.source !== 'faceit');
+        saveState();
+        renderAccountsAndHero();
+        renderStats();
+        showToast('toast_disconnected');
+      });
+
+      // Кнопка загрузки демо-профиля
+      document.getElementById('demo-fill-btn').addEventListener('click', () => {
+        state.steam = { id: '76561198084912044', premier: 21450 };
+        state.faceit = { nick: 'Kaze_CS2', elo: 2580, level: 10 };
+        state.matches = [
+          ...generatePlatformMatches('steam', '76561198084912044'),
+          ...generatePlatformMatches('faceit', 'Kaze_CS2')
+        ];
+        saveState();
+        renderAccountsAndHero();
+        renderStats();
+        showToast('toast_demo_loaded');
+      });
+
+      // Фильтрация матчей по источнику
+      document.querySelectorAll('.source-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.sourceFilter = btn.getAttribute('data-source');
+          document.querySelectorAll('.source-filter-btn').forEach(b => {
+            b.classList.remove('bg-cs-orange', 'text-black');
+            b.classList.add('text-cs-muted');
+          });
+          btn.classList.add('bg-cs-orange', 'text-black');
+          btn.classList.remove('text-cs-muted');
+          renderStats();
+        });
+      });
+
+      // Добавление матча вручную
+      document.getElementById('add-match-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const platform = document.getElementById('match-platform').value;
+        const map = document.getElementById('match-map').value;
+        const kills = parseInt(document.getElementById('match-kills').value, 10);
+        const deaths = parseInt(document.getElementById('match-deaths').value, 10);
+        const hs = parseInt(document.getElementById('match-hs').value, 10);
+
+        if (isNaN(kills) || isNaN(deaths) || isNaN(hs) || kills < 0 || deaths < 0 || hs < 0 || hs > 100) {
+          return;
+        }
+
+        state.matches.push({
+          id: `manual_${Date.now()}`,
+          source: platform,
+          map,
+          kills,
+          deaths,
+          hs
+        });
+
+        e.target.reset();
+        saveState();
+        renderStats();
+        showToast('toast_match_added');
+      });
+
+      // Поиск и фильтрация в тир-листе
+      document.getElementById('tier-search').addEventListener('input', renderTierList);
+      document.getElementById('tier-role-filter').addEventListener('change', renderTierList);
+
+      // Переключение разделов Tier 1 / Tier 2 / Tier 3
+      document.querySelectorAll('.tier-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.activeTierTab = btn.getAttribute('data-tier-tab');
+          saveState();
+          renderTierList();
+        });
+      });
+
+      // Переключение разделов команд: Сезон / За всё время
+      document.querySelectorAll('.team-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.activeTeamTab = btn.getAttribute('data-team-tab');
+          saveState();
+          renderTeamTierList();
+        });
+      });
+
+      // Поиск по тир-листу команд
+      document.getElementById('team-search').addEventListener('input', renderTeamTierList);
+
+      // Сброс тиров
+      document.getElementById('reset-tiers-btn').addEventListener('click', () => {
+        state.players = JSON.parse(JSON.stringify(DEFAULT_PRO_PLAYERS));
+        saveState();
+        renderTierList();
+        showToast('toast_tiers_reset');
+      });
+
+      // Модальное окно: закрытие и смена тира
+      document.getElementById('close-modal-btn').addEventListener('click', closePlayerModal);
+      document.getElementById('player-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'player-modal') closePlayerModal();
+      });
+
+      document.querySelectorAll('.tier-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const newTier = btn.getAttribute('data-tier');
+          const player = state.players.find(p => p.id === state.selectedPlayerId);
+          if (player && String(player.tier) !== String(newTier)) {
+            player.tier = newTier;
+            state.activeTierTab = newTier;
+            saveState();
+            renderTierList();
+            openPlayerModal(player.id);
+            showToast('toast_tier_updated');
+          }
+        });
+      });
+    }
+
+    // Запуск приложения при загрузке страницы
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      applyLanguage();
+      renderAccountsAndHero();
+      renderStats();
+      renderTierList();
+      renderTeamTierList();
+      initEvents();
+    });
+  </script>
+</body>
+</html>
